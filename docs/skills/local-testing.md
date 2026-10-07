@@ -479,3 +479,6 @@ just boot-vm     # success: GDM appears and GNOME Shell renders in noVNC
 just iso testing
 just boot-iso    # success: live session renders; serial shows UTAH_LIVE_READY
 ```
+
+See the [disposable ISO review matrix](local-testing/references/iso-review.md)
+for read-only, all-flavor offline installation tests on KVM runners.
