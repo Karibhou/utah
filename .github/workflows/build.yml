@@ -362,8 +362,8 @@ jobs:
           podman image inspect "$local_ref" > evidence/image-inspect.json
           printf 'ghcr.io/projectbluefin/%s:review-vm-%s\n' "$image_name" "$GITHUB_SHA" > evidence/image-ref.txt
           jq -n --arg sha "$GITHUB_SHA" --arg run "$GITHUB_RUN_ID" --arg flavor "$REVIEW_FLAVOR" \
-            --rawfile ref evidence/image-ref.txt \
-            --rawfile manifest evidence/payload-manifest.sha256 \
+            --arg ref "$(cat evidence/image-ref.txt)" \
+            --arg manifest "$(cut -d ' ' -f1 evidence/payload-manifest.sha256)" \
             '{source_sha:$sha,flavor:$flavor,vm_run:$run,image_ref:$ref,manifest_sha256:$manifest,publication:false}' \
             > evidence/provenance.json
       - name: Compose offline debug ISO from the local candidate

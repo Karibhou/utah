@@ -6,6 +6,13 @@ flavor in `config/flavors.json`; without it, the main flavor runs alone.
 The contract job supplies the matrix. Resolve image names with
 `scripts/flavors.py image`, never a second hardcoded image list.
 
+The `review_vm` path builds locally only when paired with `contract_only`; it
+does not publish or sign an image. If a change modifies the OGC or NVIDIA
+kernel-cache inputs, build the matching cache through the normal signed build
+pipeline before dispatching the read-only ISO matrix. The review runner must
+consume that cache; do not weaken signing or add a signing permission to this
+workflow to make the test pass.
+
 Candidate images remain in runner-local storage. The job has only contents
 and packages read permissions, disables registry cache writes, and never
 publishes or promotes. Record source SHA, flavor, raw payload manifest hash,

@@ -1,7 +1,7 @@
 ---
 name: ci-workflows
 version: "1.1"
-last_updated: "2026-10-02"
+last_updated: "2026-10-11"
 id: ci-workflows
 one_line_purpose: Navigate Utah's build, promote, and sync workflow topology.
 entry_point: docs/skills/ci-workflows.md
@@ -28,9 +28,14 @@ post-build verification workflows, not the complete workflow inventory:
 - `.github/workflows/build.yml` -- pull requests, pushes to `testing`, a
   manual dispatch. Top-level `permissions: {}`; each job
   grants its own. Cancels in-progress runs per workflow and ref. A dispatch
-  with `contract_only=true` runs only the `contract` job and skips
-  `kernel_cache`, `build_main`, `build_kernel` and `dispatch-iso`, so nothing
-  is built, pushed, signed or sent to Post-Testing E2E, even on `testing`.
+  with `contract_only=true` skips the publication jobs and `dispatch-iso`.
+  With the default `review_vm=false`, only the contract checks run. Set
+  `review_vm=true` as well to build a disposable image on the runner, compose
+  and boot an offline ISO, and retain test evidence; `review_iso_all_flavors`
+  expands that job from main flavors to every flavor in `config/flavors.json`.
+  This path has read-only registry access and never publishes or signs the
+  review image. For kernel-cache consumers, first build the matching signed
+  cache through the normal pipeline.
 - `.github/workflows/promote-testing-to-main.yml` -- pushes to `testing`, a
   nightly cron, and manual dispatch.
 - `.github/workflows/sync-main-to-testing.yml` -- source pushes to `main`,

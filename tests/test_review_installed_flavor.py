@@ -29,12 +29,12 @@ class FlavorProbeTests(unittest.TestCase):
 
     def test_wrong_flavor_fails_even_when_the_desktop_booted(self):
         self.configure("main")
-        with self.assertRaises(AssertionError):
+        with self.assertRaisesRegex(RuntimeError, "expected image flavor"):
             probe.verify_flavor("gaming", self.root, "7.1.8-ogc1")
 
     def test_gaming_fallback_to_base_kernel_fails(self):
         self.configure("gaming", "7.1.8-ogc1")
-        with self.assertRaisesRegex(AssertionError, "OGC"):
+        with self.assertRaisesRegex(RuntimeError, "OGC"):
             probe.verify_flavor("gaming", self.root, "7.2.8-200.fc44.x86_64")
 
     def test_matching_gaming_kernel_passes(self):
@@ -46,7 +46,7 @@ class FlavorProbeTests(unittest.TestCase):
     def test_nvidia_module_built_for_another_kernel_fails(self):
         self.configure("nvidia")
         with patch.object(probe, "require", return_value="7.1.8-other SMP"):
-            with self.assertRaisesRegex(AssertionError, "NVIDIA module"):
+            with self.assertRaisesRegex(RuntimeError, "NVIDIA module"):
                 probe.verify_flavor("nvidia", self.root, "7.2.8-200.fc44.x86_64")
 
 

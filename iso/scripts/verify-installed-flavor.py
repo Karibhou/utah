@@ -21,13 +21,19 @@ def verify_flavor(flavor, root=Path("/"), kernel=None):
     if not flavor:
         return {}
     metadata = json.loads((root / "usr/share/ublue-os/image-info.json").read_text())
-    assert metadata["image-flavor"] == flavor, metadata
+    actual_flavor = metadata.get("image-flavor")
+    if actual_flavor != flavor:
+        raise RuntimeError(f"expected image flavor {flavor!r}, found {actual_flavor!r}")
     kernel = kernel or require("uname", "-r")
     ogc = root / "usr/lib/utah/ogc-kernel-release"
     if "gaming" in flavor.split("-"):
-        assert ogc.read_text().strip() == kernel, "installed system did not boot its OGC kernel"
+        if not ogc.is_file():
+            raise RuntimeError("gaming flavor is missing its OGC kernel receipt")
+        if ogc.read_text().strip() != kernel:
+            raise RuntimeError("installed system did not boot its OGC kernel")
     elif ogc.exists():
-        assert ogc.read_text().strip() != kernel, "non-gaming flavor booted OGC"
+        if ogc.read_text().strip() == kernel:
+            raise RuntimeError("non-gaming flavor booted OGC")
     result = {"flavor": flavor, "kernel": kernel}
     if "gaming" in flavor.split("-"):
         require("modprobe", "tun")
@@ -35,9 +41,11 @@ def verify_flavor(flavor, root=Path("/"), kernel=None):
         result["tun_device"] = "present"
     if "nvidia" in flavor.split("-"):
         vermagic = require("modinfo", "-k", kernel, "-F", "vermagic", "nvidia")
-        assert vermagic.split()[0] == kernel, "NVIDIA module does not match booted kernel"
+        if not vermagic.split() or vermagic.split()[0] != kernel:
+            raise RuntimeError("NVIDIA module does not match booted kernel")
         module = require("modinfo", "-k", kernel, "-n", "nvidia")
-        assert Path(module).is_file(), module
+        if not Path(module).is_file():
+            raise RuntimeError(f"NVIDIA module path does not exist: {module}")
         require("test", "-x", "/usr/bin/nvidia-smi")
         result["nvidia_module"] = module
         result["nvidia_vermagic"] = vermagic
