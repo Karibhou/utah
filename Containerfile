@@ -47,6 +47,8 @@ COPY scripts/install-packages.py \
      scripts/mirror-shim.sh \
      scripts/verify-efi-chain.sh \
      scripts/fix-home-labels.sh \
+     scripts/regenerate-initramfs.sh \
+     iso/scripts/live-kernel.py \
      scripts/install-v4l2loopback.sh \
      scripts/image-repo.sh \
      /tmp/utah-scripts/
@@ -158,6 +160,8 @@ RUN --mount=type=bind,from=v4l2loopback,source=/out,target=/tmp/utah-v4l2loopbac
                 mirror-shim.sh:utah-mirror-shim \
                 verify-efi-chain.sh:utah-verify-efi-chain \
                 fix-home-labels.sh:utah-fix-home-labels \
+                regenerate-initramfs.sh:utah-regenerate-initramfs \
+                live-kernel.py:utah-live-kernel \
                 install-v4l2loopback.sh:utah-install-v4l2loopback \
                 image-repo.sh:utah-image-repo; do \
       install -Dm 0755 "/tmp/utah-inputs/tmp/utah-scripts/${pair%%:*}" "/usr/local/libexec/${pair##*:}" || exit 1; \
@@ -335,6 +339,7 @@ RUN --mount=type=bind,from=packages,source=/repository,target=/etc/utah-packages
     esac && \
     IMAGE_FLAVOR="${IMAGE_FLAVOR}" /usr/local/libexec/utah-verify-rpm-contract \
       /usr/share/utah/bluefin.toml /usr/share/utah/utah.toml && \
+    /usr/local/libexec/utah-regenerate-initramfs && \
     # The package repository is now only ever bind mounted, so it is absent from
     # the committed image. Flip it disabled here -- the last step that installs
     # anything -- so later dnf calls on the image (the live ISO build's included)

@@ -45,17 +45,10 @@ RUN chmod 0755 /tmp/utah-live-src/configure-live.sh && \
 # a harmless /root install warning in the container build context but still
 # returns a successful image with dmsquash-live included.
 #
-# tpm2-tss and pcsc are omitted because they cannot be satisfied. Hummingbird's
-# dracut config adds "fido2 tpm2-tss pkcs11 pcsc" unconditionally, and a module
-# named there is an error rather than a skip when its helpers are missing:
-# tpm2-tss wants tpm2_pcrread from tpm2-tools and pcsc wants the pcsc-lite
-# tools, and neither package exists in Hummingbird or in this factory.
-#
-# Dropping them costs nothing here. This is the live initramfs, which boots an
-# unencrypted squashfs from the ISO and has no smartcard or TPM-backed volume
-# to open; the installed system boots the payload image's own initramfs, which
-# this build never touches. Revisit if Utah ever wants TPM-bound LUKS, which
-# needs tpm2-tools in the installed image, not in the live overlay.
+# Keep TPM and smart-card unlock helpers out of the live initramfs: this
+# environment boots an unencrypted squashfs payload and has no encrypted
+# volume to unlock. The installed image builds its own initramfs after the
+# final package transaction, with the full unlock helper set.
 # /root is a symlink to /var/roothome in a bootc image and the target does not
 # exist at build time, so dracut's install of /root failed on every build:
 #     dracut-install: ERROR: installing '/root' to '/root'
@@ -65,7 +58,11 @@ RUN chmod 0755 /tmp/utah-live-src/configure-live.sh && \
 # dracut[E] FAILED line as the error it is.
 RUN set -euxo pipefail; \
     mkdir -p /var/roothome; \
-    kernel="$(ls /usr/lib/modules | sort -V | tail -1)"; \
+    kernel_dirs="$(find /usr/lib/modules -mindepth 2 -maxdepth 2 -name vmlinuz -printf '%h\n')"; \
+    if [ -z "$kernel_dirs" ] || [ "$(printf '%s\n' "$kernel_dirs" | wc -l)" -ne 1 ]; then \
+      echo "Expected one bootc kernel for the live initramfs: $kernel_dirs" >&2; exit 1; \
+    fi; \
+    kernel="${kernel_dirs##*/}"; \
     dracut --force --reproducible --no-hostonly \
       --add dmsquash-live \
       --omit 'tpm2-tss pcsc' \

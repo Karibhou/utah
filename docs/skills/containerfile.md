@@ -1,7 +1,7 @@
 ---
 name: containerfile
 version: "1.0"
-last_updated: "2026-10-02"
+last_updated: "2026-10-11"
 id: containerfile
 one_line_purpose: Edit the Containerfile without regressing layer count or cache hits.
 entry_point: docs/skills/containerfile.md
@@ -198,6 +198,12 @@ runs again in the flavor step, finds the staged module, and only registers and
 asserts it; `utah-install-v4l2loopback ogc` compiles against the OGC tree that
 `install-ogc-kernel.sh` preserves, which needs `CONFIG_VIDEO_DEV` in that
 kernel (enforced by its `required_config`).
+
+After the final NVIDIA, OGC, and v4l2loopback package steps, the flavor layer
+runs `utah-regenerate-initramfs`. The helper selects the exact bootc kernel,
+promotes the OGC kernel for gaming flavors, rebuilds that release's initramfs,
+and verifies early microcode plus the installed TPM/passkey/smart-card unlock
+modules before the image can commit.
 
 ## Clean and lint share a layer
 
