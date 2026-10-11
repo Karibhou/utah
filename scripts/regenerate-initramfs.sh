@@ -11,7 +11,6 @@
 # at the same point (build_scripts/26-packages-post.sh); this is the Utah
 # equivalent.
 #
-<<<<<<< HEAD
 # bootc deploys kernels from /usr/lib/modules/<release>/vmlinuz. Promote the
 # gaming flavor's OGC kernel from /boot into that layout before rebuilding;
 # retaining the base vmlinuz would silently boot the base instead of OGC.
@@ -23,26 +22,6 @@ fail() {
 }
 
 kver="$(/usr/local/libexec/utah-live-kernel / --select-bootc --promote-ogc)"
-||||||| parent of 86f5b90 (fix(build): regenerate the initramfs after the last package install)
-=======
-# bootc boots the one kernel that has a vmlinuz under /usr/lib/modules, so
-# that is the initramfs rebuilt here. The OGC kernel the gaming flavors carry
-# is installed under /boot and is not touched.
-set -euo pipefail
-
-fail() {
-    echo "ERROR: $*" >&2
-    exit 1
-}
-
-kernels=()
-for dir in /usr/lib/modules/*/; do
-    [ -f "${dir}vmlinuz" ] && kernels+=("$(basename "$dir")")
-done
-[ "${#kernels[@]}" -eq 1 ] \
-    || fail "expected one bootc kernel under /usr/lib/modules, found: ${kernels[*]:-none}"
-kver="${kernels[0]}"
->>>>>>> 86f5b90 (fix(build): regenerate the initramfs after the last package install)
 image="/usr/lib/modules/${kver}/initramfs.img"
 
 # No host-only: the image boots on hardware the build host knows nothing
