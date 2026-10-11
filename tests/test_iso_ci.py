@@ -116,6 +116,11 @@ class EvidenceTests(unittest.TestCase):
         self.assertIn('"dir:${PAYLOAD_EXPORT}"', script)
         self.assertIn('dir:/payload "containers-storage:$1"', script)
 
+    def test_iso_compression_level_reaches_unshare_assembly(self):
+        script = (ROOT / "iso/scripts/build-iso.sh").read_text()
+        self.assertIn('"${ISO_MAX_GB}" "${ISO_COMPRESSION_LEVEL}" <<\'ASSEMBLY\'', script)
+        self.assertIn('ISO_COMPRESSION_LEVEL="$9"', script)
+
     def test_production_boot_args_and_unsupported_paths(self):
         script = (ROOT / "iso/scripts/build-iso.sh").read_text()
         self.assertIn("enforcing=0", script)
