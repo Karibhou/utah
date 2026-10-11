@@ -1,7 +1,7 @@
 ---
 name: local-testing
 version: "1.0"
-last_updated: "2026-10-04"
+last_updated: "2026-10-11"
 id: local-testing
 one_line_purpose: Build, install, and boot Utah locally in a VM or live ISO.
 entry_point: docs/skills/local-testing.md
@@ -349,8 +349,11 @@ The live assembler selects a release from `/usr/lib/modules` and uses its
 matching initramfs. Kernel-core provides that release's `vmlinuz` in the module
 directory, while the OGC installer writes `/boot/vmlinuz-<release>`.
 `iso/scripts/live-kernel.py` supports both paths and resolves symlinks inside
-the mounted image, never against the host root. Do not use `/boot/vmlinuz` or
-another release as a fallback: that can silently pair mismatched boot files.
+the mounted image, never against the host root. The installed gaming image
+promotes its OGC kernel into the single bootc `vmlinuz` layout before rebuilding
+the matching initramfs; the live ISO builder then selects that same release.
+Do not use `/boot/vmlinuz` or another release as a fallback: that can silently
+pair mismatched boot files.
 It enables sshd through a boot argument on the disposable installed disk,
 never by rebuilding or changing the published image. `UTAH_E2E_RAM` and
 `UTAH_E2E_CPUS` control VM resources (defaults 8192 MiB and four CPUs).
