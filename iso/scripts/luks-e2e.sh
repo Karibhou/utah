@@ -593,7 +593,8 @@ if [[ -n "${UTAH_E2E_EXPECT_FLAVOR:-}" ]]; then
     ssh_target 'unshare --user --map-root-user true' || fail "unprivileged user namespaces unavailable for Flatpaks"
     echo "  unprivileged user namespace: passed"
     scp_target "${ROOT}/iso/scripts/verify-installed-flavor.py" "${TEST_USER}@127.0.0.1:/tmp/utah-verify-installed-flavor.py" >/dev/null
-    ssh_target "printf '%s\\n' '${TEST_PASSWORD}' | sudo -S -p '' python3 /tmp/utah-verify-installed-flavor.py --flavor '$UTAH_E2E_EXPECT_FLAVOR'" > "${WORK}/flavor-checks.json"
+    ssh_target "printf '%s\\n' '${TEST_PASSWORD}' | sudo -S -p '' python3 /tmp/utah-verify-installed-flavor.py --flavor '$UTAH_E2E_EXPECT_FLAVOR'" > "${WORK}/flavor-checks.json" \
+        || fail "installed flavor probe failed"
     ssh_target "printf '%s\\n' '${TEST_PASSWORD}' | sudo -S -p '' bootc status --json" > "${WORK}/bootc-status.json"
 fi
 

@@ -18,6 +18,9 @@ PUBLISHED_IMAGE="${5:-ghcr.io/projectbluefin/utah:testing}"
 # previous 8.6G image. Revisit it after a deliberate, measured size change.
 # Override per-run with UTAH_ISO_MAX_GB (GB) without editing this script.
 ISO_MAX_GB="${UTAH_ISO_MAX_GB:-6}"
+# Higher zstd compression keeps the largest flavor under the existing ISO
+# size budget without removing packages from the offline payload.
+ISO_COMPRESSION_LEVEL="${UTAH_ISO_COMPRESSION_LEVEL:-15}"
 LABEL="UTAH_LIVE"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 mkdir -p "$(dirname "${OUTPUT_ISO}")"
@@ -131,7 +134,7 @@ rm -rf "${PAYLOAD_EXPORT}" "${PAYLOAD_STORE}" "${STORAGE_CONF}"
 SQUASHFS="${WORK}/squashfs.img"
 echo "Creating live rootfs (${KERNEL})"
 mksquashfs "${SQUASHFS_ROOT}" "${SQUASHFS}" \
-    -noappend -comp zstd -Xcompression-level 3 -b 131072 -processors 4 \
+    -noappend -comp zstd -Xcompression-level "${ISO_COMPRESSION_LEVEL}" -b 131072 -processors 4 \
     -wildcards -e 'proc/*' -e 'sys/*' -e 'dev/*' -e run -e tmp
 
 ESP_MB=$(( $(du -m "${INITRD}" | cut -f1) + $(du -m "${VMLINUZ}" | cut -f1) + 32 ))
