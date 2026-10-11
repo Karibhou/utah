@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Find the selected release's kernel in a mounted live image, not the host."""
+"""Select and optionally promote the bootc kernel inside a mounted live image."""
 import argparse
 from collections import deque
 from pathlib import Path, PurePosixPath
-import shutil
 
 
 def image_file(root, name):
@@ -71,7 +70,8 @@ def bootc_release(root, promote_ogc=False):
             if target.is_symlink():
                 target.unlink()
             if source != target:
-                shutil.copy2(source, target)
+                target.unlink(missing_ok=True)
+                target.hardlink_to(source)
             for directory in other:
                 # Keep module trees needed by module installers and RPM metadata;
                 # only the selected kernel is a bootc deployment kernel.
@@ -97,8 +97,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path)
     parser.add_argument("release", nargs="?")
-    parser.add_argument("--select-bootc", action="store_true")
-    parser.add_argument("--promote-ogc", action="store_true")
+    parser.add_argument(
+        "--select-bootc",
+        action="store_true",
+        help="validate the mounted image has one bootc-selected kernel",
+    )
+    parser.add_argument(
+        "--promote-ogc",
+        action="store_true",
+        help="promote the recorded OGC kernel and remove base boot artifacts",
+    )
     args = parser.parse_args()
     if args.promote_ogc and not args.select_bootc:
         parser.error("--promote-ogc requires --select-bootc")

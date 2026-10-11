@@ -88,6 +88,7 @@ class BootcKernelSelectionTests(unittest.TestCase):
                 kernel.bootc_release(root)
             self.assertEqual(kernel.bootc_release(root, promote_ogc=True), "7.1.8-ogc1")
             self.assertEqual((ogc / "vmlinuz").read_bytes(), b"gaming kernel")
+            self.assertTrue((ogc / "vmlinuz").samefile(boot / "vmlinuz-7.1.8-ogc1"))
             self.assertFalse((base / "vmlinuz").exists())
             self.assertFalse((base / "initramfs.img").exists())
             self.assertEqual((base / "module.ko").read_bytes(), b"retain RPM module tree")
