@@ -400,12 +400,13 @@ build: PRs do not publish immutable images. This matrix validates emulated
 UEFI desktop installation, not Secure Boot, TPM unlock, or physical GPUs.
 
 The ISO size is bounded in `iso/scripts/build-iso.sh`: it fails closed above
-the 6 GB `ISO_MAX_GB` default (override per-run with `UTAH_ISO_MAX_GB`) once
-the ISO is written. Successful post-fix E2E run `35469913325` measured 3.9G
-(utah), 4.6G (gaming), 5.2G (nvidia), and 5.3G (nvidia-gaming), leaving 0.7G
-headroom for the largest flavor. The guard lives in the build script, so it
-holds for every caller (local `just iso`, the CI LUKS job, and any deliberate
-rerun), not just one workflow.
+the 6 GiB `ISO_MAX_GB` default (override per-run with `UTAH_ISO_MAX_GB`) once
+the ISO is written. Historical post-fix E2E run `35469913325` measured 3.9G
+(utah), 4.6G (gaming), 5.2G (nvidia), and 5.3G (nvidia-gaming). Diagnostic
+run `38175242606` measured 4.7G, 5.5G, 6.0G, and 6.1G at the production zstd
+level 3; the nvidia-gaming overage is tracked in #684. The opt-in review VM
+matrix sets `UTAH_ISO_COMPRESSION_LEVEL=15` only to reach install/boot checks;
+local `just iso` and production callers retain level 3 and the 6 GiB guard.
 
 ### Tacklebox image pin
 

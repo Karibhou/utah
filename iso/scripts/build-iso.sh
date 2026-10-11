@@ -10,17 +10,18 @@ DEBUG="${4:-0}"
 # SOURCE_IMAGE may be localhost for development, but the embedded store and
 # installer recipe use this stable, publishable reference.
 PUBLISHED_IMAGE="${5:-ghcr.io/projectbluefin/utah:testing}"
-# Live-ISO size budget (#128). The ISO embeds the full container store for
-# offline install, so image growth shows up twice in the ISO. The successful
-# post-fix E2E run 35469913325 (2026-09-19) measured 3.9G (utah), 4.6G
-# (gaming), 5.2G (nvidia), and 5.3G (nvidia-gaming). A 6 GB ceiling leaves
-# 0.7 GB headroom for the largest flavor while failing a regression like the
-# previous 8.6G image. Revisit it after a deliberate, measured size change.
+# Live-ISO size budget (#684). The ISO embeds the full container store for
+# offline install, so image growth shows up twice in the ISO. Post-fix E2E run
+# 35469913325 (2026-09-19) measured 3.9G (utah), 4.6G (gaming), 5.2G (nvidia),
+# and 5.3G (nvidia-gaming). Diagnostic run 38175242606 (2026-10-11), at the
+# default zstd level 3, measured 4.7G, 5.5G, 6.0G, and 6.1G respectively; the
+# nvidia-gaming overage is tracked in #684. Keep the 6 GiB guard as a regression
+# detector; the review-VM workflow uses a test-only compression override.
 # Override per-run with UTAH_ISO_MAX_GB (GB) without editing this script.
 ISO_MAX_GB="${UTAH_ISO_MAX_GB:-6}"
-# Higher zstd compression keeps the largest flavor under the existing ISO
-# size budget without removing packages from the offline payload.
-ISO_COMPRESSION_LEVEL="${UTAH_ISO_COMPRESSION_LEVEL:-15}"
+# Production/local callers keep the measured default; review VM can override
+# this to reach the all-flavor install/boot checks while #684 tracks size.
+ISO_COMPRESSION_LEVEL="${UTAH_ISO_COMPRESSION_LEVEL:-3}"
 LABEL="UTAH_LIVE"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 mkdir -p "$(dirname "${OUTPUT_ISO}")"
