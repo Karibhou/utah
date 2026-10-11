@@ -1,7 +1,7 @@
 ---
 name: kernel-cache
 version: "1.0"
-last_updated: "2026-10-11"
+last_updated: "2026-09-19"
 id: kernel-cache
 one_line_purpose: Understand and rebuild the OGC kernel and NVIDIA module cache image.
 entry_point: docs/skills/kernel-cache.md
@@ -155,13 +155,6 @@ are not enabled yet: they need linux-firmware in the image, which the install
 set does not carry (projectbluefin/utah#97). When diagnosing a black live
 session, compare `live-serial.log` for `[drm] Initialized` lines between the
 `main` and `gaming` diagnostics artifacts before reading GDM logs.
-
-The gaming kernel also requires user namespaces, memory cgroups, seccomp filters,
-and TUN for Flatpak's bubblewrap sandbox and VPN clients. `install-ogc-kernel.sh`
-asserts these on both source builds and cache extraction. Because the kernel
-script is part of the cache key, changing these options creates a new cache tag;
-rebuild it through the normal signed pipeline before running the read-only
-all-flavor ISO review matrix.
 
 ```bash
 just kernel-cache-tag
