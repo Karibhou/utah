@@ -1,0 +1,108 @@
+name: Update GNOME extensions
+
+on:
+  schedule:
+    - cron: "29 4 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: utah-gnome-extension-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          persist-credentials: false
+          submodules: true
+
+      - name: Bump extension submodules to tracked-branch heads
+        id: bump
+        run: |
+          set -euo pipefail
+          # create-pull-request runs even on an empty diff so a reversion can
+          # close the stale bump PR. It still needs a body file on that path.
+          : > "$RUNNER_TEMP/gnome-extensions-pr.md"
+          paths=$(git config --file .gitmodules --get-regexp '^submodule\..*\.path' | cut -d' ' -f2)
+          # Word-splitting intended: one path per line, no spaces in tree.
+          # shellcheck disable=SC2086
+          echo "$paths" | xargs git submodule update --init --depth 1 --
+          # A shallow submodule checkout fetches only the remote default
+          # branch. Fetch each configured branch explicitly before selecting
+          # it, since some extensions track a non-default release branch.
+          git config --file .gitmodules --get-regexp '^submodule\..*\.path$' |
+            while read -r key path; do
+              name=${key#submodule.}
+              name=${name%.path}
+              branch=$(git config --file .gitmodules --get "submodule.$name.branch" || true)
+              if [ -n "$branch" ]; then
+                git -C "$path" fetch --depth=1 origin \
+                  "+refs/heads/$branch:refs/remotes/origin/$branch"
+                git -C "$path" checkout --detach "refs/remotes/origin/$branch"
+              else
+                git submodule update --remote --depth 1 -- "$path"
+              fi
+            done
+          {
+            echo "# GNOME extension bumps"
+            echo
+            echo "Moves each extension submodule to the head of its tracked branch."
+            echo "This workflow dispatches contract-only CI on the proposed branch."
+            echo "It does not run the image-side extension verifier or build an image."
+            echo
+            echo "This PR intentionally does not auto-merge; a new upstream"
+            echo "head can break the GNOME 51 support range or the build"
+            echo "script's assumptions (paths, schemas, meson targets)."
+            echo
+            echo "## Heads"
+            echo
+            echo "| extension | old | new | GNOME shell-version |"
+            echo "|---|---|---|---|"
+            while read -r p; do
+              old=$(git ls-tree HEAD "$p" | cut -f1 | cut -d' ' -f3)
+              new=$(git -C "$p" rev-parse HEAD)
+              if [ "$old" = "$new" ]; then
+                ver="(unchanged)"
+              else
+                ver=$(python3 scripts/gnome-extension-shell-versions.py "$p")
+              fi
+              # shellcheck disable=SC2016
+              printf '| `%s` | `%s` | `%s` | %s |\n' "$p" "${old:0:12}" "${new:0:12}" "$ver"
+            done <<< "$paths"
+          } > "$RUNNER_TEMP/gnome-extensions-pr.md"
+          # Always run create-pull-request, including on an empty diff, so it
+          # can close a stale automation PR after an upstream reversion.
+
+      - name: Propose GNOME extension update
+        id: propose
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
+        with:
+          branch: automation/gnome-extension-bumps
+          title: 'ci(extensions): bump pinned GNOME extensions'
+          commit-message: 'ci(extensions): bump pinned GNOME extensions'
+          body-path: ${{ runner.temp }}/gnome-extensions-pr.md
+          # One directory covers future extension additions; only gitlinks change.
+          add-paths: |
+            system_files/shared/usr/share/gnome-shell/extensions
+
+      - name: Start the contract checks on the bump branch explicitly
+        if: contains(fromJSON('["created", "updated"]'), steps.propose.outputs.pull-request-operation)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        # contract_only: a dispatch is not a pull_request event, so a full
+        # build here would push and sign testing images from unreviewed
+        # upstream extension heads. Run the contract gates only.
+        run: |
+          gh workflow run build.yml --repo "$REPOSITORY" --ref automation/gnome-extension-bumps \
+            -f contract_only=true
