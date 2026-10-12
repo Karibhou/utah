@@ -15,6 +15,7 @@ and build args that differ between the runs for reasons unrelated to residue
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import tempfile
@@ -71,7 +72,7 @@ class ReproducibilityCheckTests(unittest.TestCase):
         self.cosign.chmod(0o755)
 
     def run_check(self, first: str, second: str, flavor: str = "main", verify_status: int = 0,
-                  podman_version: str = "5.6.0"):
+                  podman_version: str = "5.6.0", script: Path = SCRIPT):
         layers_a = self.tmp / "a"
         layers_b = self.tmp / "b"
         layers_a.write_text(first)
@@ -88,7 +89,7 @@ class ReproducibilityCheckTests(unittest.TestCase):
             "PODMAN_VERSION": podman_version,
         })
         return subprocess.run(
-            ["bash", str(SCRIPT), flavor],
+            ["bash", str(script), flavor],
             cwd=ROOT, env=env, capture_output=True, text=True)
 
     def builds(self) -> list[str]:
@@ -154,6 +155,26 @@ class ReproducibilityCheckTests(unittest.TestCase):
         for invocation in self.builds():
             self.assertIn("--build-arg IMAGE_FLAVOR=nvidia-gaming", invocation)
 
+    def test_each_flavor_builds_under_its_published_image_name(self):
+        # build-ghcr takes IMAGE_NAME from scripts/flavors.py; the probe must
+        # too, or a kernel flavor bakes the main image's image-ref into
+        # image-info.json and the two builds compare an image CI never ships.
+        roster = subprocess.run(
+            ["python3", str(ROOT / "scripts" / "flavors.py"), "list"],
+            check=True, capture_output=True, text=True).stdout
+        for flavor in json.loads(roster):
+            with self.subTest(flavor=flavor):
+                self.build_log.write_text("")
+                expected = subprocess.run(
+                    ["python3", str(ROOT / "scripts" / "flavors.py"), "image", flavor],
+                    check=True, capture_output=True, text=True).stdout.strip()
+                result = self.run_check(IDENTICAL, IDENTICAL, flavor=flavor)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                builds = self.builds()
+                self.assertEqual(len(builds), 2)
+                for invocation in builds:
+                    self.assertIn(f"--build-arg IMAGE_NAME={expected} ", invocation)
+
     def test_kernel_flavors_build_only_the_verified_immutable_cache(self):
         result = self.run_check(IDENTICAL, IDENTICAL, flavor="nvidia")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -169,6 +190,34 @@ class ReproducibilityCheckTests(unittest.TestCase):
         result = self.run_check(IDENTICAL, IDENTICAL, flavor="desktop")
         self.assertEqual(result.returncode, 2)
         self.assertIn("unknown flavor", result.stderr)
+        self.assertEqual(self.builds(), [], "nothing should have been built")
+
+    def _run_with_config(self, config: str, flavor: str):
+        # Run a copy of the script against its own config/flavors.json, so the
+        # roster can be narrowed without touching the repository's.
+        tree = self.tmp / "tree"
+        (tree / "scripts").mkdir(parents=True)
+        (tree / "config").mkdir()
+        for name in ("check-reproducible-build.sh", "flavors.py", "podman-epoch-args.sh"):
+            target = tree / "scripts" / name
+            target.write_text((ROOT / "scripts" / name).read_text())
+            target.chmod(0o755)
+        (tree / "config" / "flavors.json").write_text(config)
+        return self.run_check(IDENTICAL, IDENTICAL, flavor=flavor,
+                              script=tree / "scripts" / "check-reproducible-build.sh")
+
+    def test_a_retired_flavor_is_rejected_before_building(self):
+        result = self._run_with_config(
+            json.dumps({"flavors": ["main"], "retired": {"nvidia": "switched off"}}), "nvidia")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("unknown flavor: nvidia", result.stderr)
+        self.assertEqual(self.builds(), [], "nothing should have been built")
+
+    def test_a_broken_roster_is_not_reported_as_an_unknown_flavor(self):
+        result = self._run_with_config("{not json", "main")
+        self.assertEqual(result.returncode, 2)
+        self.assertNotIn("unknown flavor", result.stderr)
+        self.assertIn("cannot read the flavor roster", result.stderr)
         self.assertEqual(self.builds(), [], "nothing should have been built")
 
 
