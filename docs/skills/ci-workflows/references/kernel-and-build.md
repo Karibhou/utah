@@ -94,7 +94,12 @@ and confusingly, so this reads the same list (comment,
 `.github/workflows/promote-testing-to-main.yml`). The `promote` job calls
 `reusable-promote-squash.yml@v1` (same SHA pin) against
 `ghcr.io/<owner>`, with a cosign identity regexp pinned to
-`build.yml@refs/heads/testing` and `run_e2e: false`.
+`build.yml@refs/heads/testing` and `run_e2e: true`, with
+`e2e_suites: smoke,common,nvidia`. The `promote` job is restricted to the
+trusted `main` workflow ref. The source commit is eligible for branch
+promotion only after `post-testing-e2e.yml` publishes its trusted
+`e2e/post-testing` status on that exact SHA; that status follows the LUKS,
+production-ISO, full flavor testsuite, and testing-tag promotion gates.
 
 ## sync-main-to-testing
 
