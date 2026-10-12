@@ -1,7 +1,7 @@
 ---
 name: ci-workflows
 version: "1.1"
-last_updated: "2026-10-02"
+last_updated: "2026-10-11"
 id: ci-workflows
 one_line_purpose: Navigate Utah's build, promote, and sync workflow topology.
 entry_point: docs/skills/ci-workflows.md
@@ -28,9 +28,14 @@ post-build verification workflows, not the complete workflow inventory:
 - `.github/workflows/build.yml` -- pull requests, pushes to `testing`, a
   manual dispatch. Top-level `permissions: {}`; each job
   grants its own. Cancels in-progress runs per workflow and ref. A dispatch
-  with `contract_only=true` runs only the `contract` job and skips
-  `kernel_cache`, `build_main`, `build_kernel` and `dispatch-iso`, so nothing
-  is built, pushed, signed or sent to Post-Testing E2E, even on `testing`.
+  with `contract_only=true` skips the publication jobs and `dispatch-iso`.
+  With the default `review_vm=false`, only the contract checks run. Set
+  `review_vm=true` as well to build a disposable image on the runner, compose
+  and boot an offline ISO, and retain test evidence; `review_iso_all_flavors`
+  expands that job from main flavors to every flavor in `config/flavors.json`.
+  This path has read-only registry access and never publishes or signs the
+  review image. For kernel-cache consumers, first build the matching signed
+  cache through the normal pipeline.
 - `.github/workflows/promote-testing-to-main.yml` -- pushes to `testing`, a
   nightly cron, and manual dispatch.
 - `.github/workflows/sync-main-to-testing.yml` -- source pushes to `main`,
@@ -395,12 +400,13 @@ build: PRs do not publish immutable images. This matrix validates emulated
 UEFI desktop installation, not Secure Boot, TPM unlock, or physical GPUs.
 
 The ISO size is bounded in `iso/scripts/build-iso.sh`: it fails closed above
-the 6 GB `ISO_MAX_GB` default (override per-run with `UTAH_ISO_MAX_GB`) once
-the ISO is written. Successful post-fix E2E run `35469913325` measured 3.9G
-(utah), 4.6G (gaming), 5.2G (nvidia), and 5.3G (nvidia-gaming), leaving 0.7G
-headroom for the largest flavor. The guard lives in the build script, so it
-holds for every caller (local `just iso`, the CI LUKS job, and any deliberate
-rerun), not just one workflow.
+the 6 GiB `ISO_MAX_GB` default (override per-run with `UTAH_ISO_MAX_GB`) once
+the ISO is written. Historical post-fix E2E run `35469913325` measured 3.9G
+(utah), 4.6G (gaming), 5.2G (nvidia), and 5.3G (nvidia-gaming). Diagnostic
+run `38175242606` measured 4.7G, 5.5G, 6.0G, and 6.1G at the production zstd
+level 3; the nvidia-gaming overage is tracked in #684. The opt-in review VM
+matrix sets `UTAH_ISO_COMPRESSION_LEVEL=15` only to reach install/boot checks;
+local `just iso` and production callers retain level 3 and the 6 GiB guard.
 
 ### Tacklebox image pin
 

@@ -10,14 +10,18 @@ DEBUG="${4:-0}"
 # SOURCE_IMAGE may be localhost for development, but the embedded store and
 # installer recipe use this stable, publishable reference.
 PUBLISHED_IMAGE="${5:-ghcr.io/projectbluefin/utah:testing}"
-# Live-ISO size budget (#128). The ISO embeds the full container store for
-# offline install, so image growth shows up twice in the ISO. The successful
-# post-fix E2E run 35469913325 (2026-09-19) measured 3.9G (utah), 4.6G
-# (gaming), 5.2G (nvidia), and 5.3G (nvidia-gaming). A 6 GB ceiling leaves
-# 0.7 GB headroom for the largest flavor while failing a regression like the
-# previous 8.6G image. Revisit it after a deliberate, measured size change.
+# Live-ISO size budget (#684). The ISO embeds the full container store for
+# offline install, so image growth shows up twice in the ISO. Post-fix E2E run
+# 35469913325 (2026-09-19) measured 3.9G (utah), 4.6G (gaming), 5.2G (nvidia),
+# and 5.3G (nvidia-gaming). Diagnostic run 38175242606 (2026-10-11), at the
+# default zstd level 3, measured 4.7G, 5.5G, 6.0G, and 6.1G respectively; the
+# nvidia-gaming overage is tracked in #684. Keep the 6 GiB guard as a regression
+# detector; the review-VM workflow uses a test-only compression override.
 # Override per-run with UTAH_ISO_MAX_GB (GB) without editing this script.
 ISO_MAX_GB="${UTAH_ISO_MAX_GB:-6}"
+# Production/local callers keep the measured default; review VM can override
+# this to reach the all-flavor install/boot checks while #684 tracks size.
+ISO_COMPRESSION_LEVEL="${UTAH_ISO_COMPRESSION_LEVEL:-3}"
 LABEL="UTAH_LIVE"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 mkdir -p "$(dirname "${OUTPUT_ISO}")"
@@ -58,7 +62,7 @@ podman build --layers \
 # Image mounts live in rootless Podman's user namespace. Keep the complete
 # mount/copy/assembly operation inside podman unshare rather than leaking a
 # namespace-private mount path back to the host shell.
-podman unshare bash -s -- "${LIVE_IMAGE}" "${IMAGE}" "${PUBLISHED_IMAGE}" "${OUTPUT_ISO}" "${TITLE}" "${LABEL}" "${WORK}" "${ISO_MAX_GB}" <<'ASSEMBLY'
+podman unshare bash -s -- "${LIVE_IMAGE}" "${IMAGE}" "${PUBLISHED_IMAGE}" "${OUTPUT_ISO}" "${TITLE}" "${LABEL}" "${WORK}" "${ISO_MAX_GB}" "${ISO_COMPRESSION_LEVEL}" <<'ASSEMBLY'
 set -euo pipefail
 LIVE_IMAGE="$1"
 PAYLOAD_IMAGE="$2"
@@ -68,6 +72,7 @@ TITLE="$5"
 LABEL="$6"
 WORK="$7"
 ISO_MAX_GB="$8"
+ISO_COMPRESSION_LEVEL="$9"
 MOUNT="$(podman image mount "${LIVE_IMAGE}")"
 cleanup() {
     set +e
@@ -131,7 +136,7 @@ rm -rf "${PAYLOAD_EXPORT}" "${PAYLOAD_STORE}" "${STORAGE_CONF}"
 SQUASHFS="${WORK}/squashfs.img"
 echo "Creating live rootfs (${KERNEL})"
 mksquashfs "${SQUASHFS_ROOT}" "${SQUASHFS}" \
-    -noappend -comp zstd -Xcompression-level 3 -b 131072 -processors 4 \
+    -noappend -comp zstd -Xcompression-level "${ISO_COMPRESSION_LEVEL}" -b 131072 -processors 4 \
     -wildcards -e 'proc/*' -e 'sys/*' -e 'dev/*' -e run -e tmp
 
 ESP_MB=$(( $(du -m "${INITRD}" | cut -f1) + $(du -m "${VMLINUZ}" | cut -f1) + 32 ))
