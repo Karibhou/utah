@@ -1,7 +1,7 @@
 ---
 name: setup-hooks
 version: "1.0"
-last_updated: "2026-10-03"
+last_updated: "2026-10-12"
 id: setup-hooks
 one_line_purpose: Change a first-boot setup hook without breaking the once-only contract.
 entry_point: docs/skills/setup-hooks.md
@@ -26,6 +26,14 @@ Hooks live in two directories:
 - `system_files/shared/usr/share/ublue-os/user-setup.hooks.d/` — runs per user.
 - `system_files/shared/usr/share/ublue-os/privileged-setup.hooks.d/` — runs via
   pkexec as root, when a privileged action is needed.
+
+`user-setup.hooks.d/99-privileged.sh` is the bridge between the two: it
+escalates to `ublue-privileged-setup` on every user login. It skips the GDM
+sessions outright — greeter and initial-setup run as a transient `gdm-*`
+account (or with a HOME under `/run/gdm/home`) whose SHELL is not listed in
+`/etc/shells`, so pkexec logs an error for each one, and privileged hooks
+stamp once-only completion system-wide anyway, so the greeter has nothing to
+do. The first real login runs them (see `99-privileged.sh`).
 
 Every hook sources `/usr/lib/ublue/setup-services/libsetup.sh` (shipped by
 `projectbluefin/common` through the pinned `COMMON_IMAGE_SHA`).
