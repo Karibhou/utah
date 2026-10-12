@@ -158,6 +158,9 @@ scripts/config --module OVERLAY_FS --module SQUASHFS --enable SQUASHFS_ZSTD \
 scripts/config --enable SYSFB --enable SYSFB_SIMPLEFB \
                --enable DRM --enable DRM_SIMPLEDRM \
                --module DRM_VIRTIO_GPU --module DRM_BOCHS
+# GNOME's Flatpak sandbox needs unprivileged user namespaces, and Tailscale
+# needs the TUN device. x86_64_defconfig leaves both off in the OGC kernel.
+scripts/config --enable NAMESPACES --enable USER_NS --module TUN
 # The V4L2 core for v4l2loopback (see required_config). VIDEO_DEV sits inside
 # `if MEDIA_SUPPORT`, in a menu that MEDIA_SUPPORT_FILTER (on by default
 # without EXPERT) hides, so it takes its default -- which is on only when a
