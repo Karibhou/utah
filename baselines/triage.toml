@@ -503,11 +503,6 @@ status = "planned"
 area = "desktop-apps"
 issue = "#263"
 
-[package.ffmpegthumbnailer]
-status = "planned"
-area = "desktop-apps"
-issue = "#263"
-
 [package.gnome-epub-thumbnailer]
 status = "planned"
 area = "desktop-apps"
@@ -1034,9 +1029,6 @@ status = "untriaged"
 status = "untriaged"
 
 [package.capstone]
-status = "untriaged"
-
-[package.cracklib-dicts]
 status = "untriaged"
 
 [package.desktop-file-utils]
