@@ -525,6 +525,17 @@ class OgcKernelConfigGateTests(unittest.TestCase):
     def test_btrfs_is_required(self):
         self.assertIn("BTRFS_FS", self.required_symbols())
 
+    def test_flatpak_user_namespaces_and_tailscale_tun_are_required(self):
+        symbols = self.required_symbols()
+        for symbol in ("USER_NS", "TUN"):
+            with self.subTest(symbol=symbol):
+                self.assertIn(symbol, symbols)
+                body = "".join(f"CONFIG_{item}=y\n" for item in symbols
+                               if item != symbol)
+                result = self.gate(body)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(f"missing CONFIG_{symbol}", result.stderr)
+
     def test_a_config_missing_btrfs_is_rejected_by_name(self):
         body = "".join(f"CONFIG_{s}=y\n" for s in self.required_symbols()
                        if s != "BTRFS_FS")

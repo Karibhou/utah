@@ -53,7 +53,7 @@ required_config=(SCHED_CLASS_EXT NTSYNC ANDROID_BINDERFS
                  OVERLAY_FS SQUASHFS SQUASHFS_ZSTD EROFS_FS BTRFS_FS
                  BLK_DEV_LOOP ISO9660_FS BLK_DEV_DM DM_SNAPSHOT DM_CRYPT
                  CRYPTO_XTS FUSE_FS FS_VERITY
-                 SYSFB_SIMPLEFB DRM_SIMPLEDRM VIDEO_DEV)
+                 SYSFB_SIMPLEFB DRM_SIMPLEDRM VIDEO_DEV USER_NS TUN)
 verify_config() {
   local config="$1" symbol
   for symbol in "${required_config[@]}"; do
