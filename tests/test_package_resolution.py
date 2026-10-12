@@ -63,8 +63,11 @@ class PackageResolutionTests(unittest.TestCase):
             source = Path(tmp) / "sources"
             destination = Path(tmp) / "missing" / "libexec"
             source.mkdir()
+            source_paths = {"live-kernel.py": ROOT / "iso/scripts/live-kernel.py"}
             for name, _ in pairs:
-                (source / name).write_bytes((ROOT / "scripts" / name).read_bytes())
+                script = source_paths.get(name, ROOT / "scripts" / name)
+                self.assertTrue(script.is_file(), f"missing Containerfile helper source: {script}")
+                (source / name).write_bytes(script.read_bytes())
             script = loop.replace("/tmp/utah-inputs/tmp/utah-scripts", str(source)).replace(
                 "/usr/local/libexec", str(destination))
             subprocess.run(["bash", "-eu", "-c", script], check=True)

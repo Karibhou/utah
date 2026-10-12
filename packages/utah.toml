@@ -271,6 +271,12 @@ packages = [
     "libpcap",
     "linux-atm-libs",
     "pipewire-config-raop",
+    # The regenerated installed initramfs needs the helpers for Common's
+    # TPM, passkey, and smart-card unlock modules. These are published by the
+    # pinned factory image (utah-packages#364).
+    "tpm2-tools",
+    "pcsc-lite",
+    "pcsc-lite-ccid",
     "setools-console",
     # Network filesystems: base-image parity measured from the published
     # Bluefin image (baselines/GAP.md, #263). Bluefin inherits the full samba
@@ -332,9 +338,9 @@ packages = [
     "libertas-firmware",
     # Intel/AMD CPU microcode updates, packaged separately from
     # linux-firmware (#382). microcode_ctl was deliberately absent because
-    # the factory had no recipe; the factory now publishes one. Early loading
-    # also needs the initramfs regenerated after this install: until #564
-    # lands, the shipped initramfs carries no microcode at all.
+    # the factory had no recipe; the factory now publishes one. The image's
+    # last package step regenerates the initramfs, which places both this and
+    # linux-firmware's amd-ucode in the early microcode cpio (#564).
     "microcode_ctl",
 ]
 
