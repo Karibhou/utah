@@ -31,7 +31,7 @@ jobs:
         run: echo "list=$(python3 scripts/flavors.py images)" >> "$GITHUB_OUTPUT"
 
   promote:
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
     needs: variants
     uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@a52da5670b9337598cbc80c4d6a9a7b21e770aec # v1
     with:

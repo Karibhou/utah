@@ -16,10 +16,10 @@ The cadence is RFC'd in #336. What runs today:
   production-ISO composition, and every configured testsuite flavor matrix
   pass. `post-testing-e2e.yml` moves the entire validated digest set from one
   successful build and records `e2e/post-testing` on its source SHA;
-  `promote-testing-to-main.yml` requires that status and runs the reusable
-  promoter only from its trusted `main` ref. Its daily 04:00 UTC schedule
-  means `:testing` is at most a day behind `main`, and `main` at most a day
-  behind the newest validated image.
+  `promote-testing-to-main.yml` requires that status. Pushes to `testing` and
+  the daily schedule run promotion; a manual dispatch is accepted only from
+  trusted `main`. The daily 04:00 UTC schedule means `:testing` is at most a
+  day behind `main`, and `main` at most a day behind the newest validated image.
 - `:stable` moves in `execute-release.yml` on every promotion push to `main`,
   gated by `run_release_gate: true` over `smoke,common`. A weekly promotion
   rather than a per-promotion one is still an open question in #336 -- that is

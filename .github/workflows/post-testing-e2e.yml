@@ -330,8 +330,11 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      superseded: ${{ steps.promote.outputs.superseded }}
     steps:
       - name: Promote only the tested digests if still current
+        id: promote
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -339,8 +342,10 @@ jobs:
           MATRIX: ${{ needs.resolve.outputs.matrix }}
         run: |
           set -euo pipefail
+          echo "superseded=false" >> "$GITHUB_OUTPUT"
           current=$(gh api "repos/$REPOSITORY/commits/testing" --jq .sha)
           if [[ "$current" != "$SOURCE_SHA" ]]; then
+            echo "superseded=true" >> "$GITHUB_OUTPUT"
             echo "Superseded build: retaining evidence without moving tags."
             exit 0
           fi
@@ -366,6 +371,7 @@ jobs:
           ISO_RESULT: ${{ needs.production-iso.result }}
           TESTSUITE_RESULT: ${{ needs.testsuite.result }}
           PROMOTION_RESULT: ${{ needs.promote-to-testing.result }}
+          SUPERSEDED: ${{ needs.promote-to-testing.outputs.superseded }}
         run: |
           set -euo pipefail
           state=success
@@ -374,6 +380,8 @@ jobs:
                 "$TESTSUITE_RESULT" != success || "$PROMOTION_RESULT" != success ]]; then
             state=failure
             description="Exact-digest gate blocked: LUKS=$LUKS_RESULT ISO=$ISO_RESULT suites=$TESTSUITE_RESULT tags=$PROMOTION_RESULT"
+          elif [[ "$SUPERSEDED" == "true" ]]; then
+            description="Exact-digest gates passed; source superseded, tags unchanged"
           fi
           gh api "repos/$REPOSITORY/statuses/$SOURCE_SHA" -X POST \
             --field state="$state" \

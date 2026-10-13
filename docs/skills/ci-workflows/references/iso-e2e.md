@@ -71,11 +71,13 @@ testsuite matrices; a superseded testing commit cannot move tags. Registry
 tag copies are sequential, not an atomic multi-tag transaction: a registry
 failure can interrupt promotion after a partial copy.
 
-After tag promotion, the workflow publishes the trusted `e2e/post-testing`
-commit status on the source SHA. `promote-testing-to-main.yml` sets
+After the gate completes, the workflow publishes the trusted `e2e/post-testing`
+commit status on the source SHA. A superseded build reports that exact-digest
+tests passed but tags were left unchanged; it does not advance moving tags. A
+failed suite publishes a failure status and prevents both testing-tag
+advancement and branch promotion. `promote-testing-to-main.yml` sets
 `run_e2e: true`; the reusable release gate requires this status before it can
-enqueue or auto-merge the promotion PR. A failed suite publishes a failure
-status and prevents both testing-tag advancement and branch promotion.
+enqueue or auto-merge the promotion PR.
 
 A separate least-privilege job proposes the main desktop's screenshots in
 `automation/iso-verification`, a documentation PR. It also depends on
