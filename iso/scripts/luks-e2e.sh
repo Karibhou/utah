@@ -178,6 +178,7 @@ send_keys() {
 }
 
 qemu_pids=()
+serial_follow_pid=""
 # Never the disk itself: post-testing-e2e.yml explicitly never uploads
 # install.qcow2 because it carries the test LUKS passphrase, the test
 # account password, and host keys. qemu-img's own metadata is not guest
@@ -207,6 +208,10 @@ cleanup() {
     # trap that always runs, not only in the helper that sometimes does.
     local status=$?
     (( status != 0 )) && preserve_failed_disk_diagnostics
+    if [[ -n "${serial_follow_pid}" ]]; then
+        kill "${serial_follow_pid}" 2>/dev/null || true
+        wait "${serial_follow_pid}" 2>/dev/null || true
+    fi
     for pid in "${qemu_pids[@]:-}"; do
         [[ -n "${pid}" ]] && kill "${pid}" 2>/dev/null || true
     done
@@ -214,6 +219,191 @@ cleanup() {
 trap cleanup EXIT
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
+
+check_system_unit_state() {
+    local unit="$1" required_enabled="${2:-false}" required_run="${3:-false}" boot_pass="${4:-first}"
+    local state load_state="" active_state="" result="" start_time="" key value
+    state="$(ssh_target "printf '%s\\n' '${TEST_PASSWORD}' | sudo -S -p '' systemctl show --property=LoadState --property=ActiveState --property=Result --property=ExecMainStartTimestamp '${unit}'" 2>/dev/null || true)"
+    while IFS='=' read -r key value; do
+        case "${key}" in
+            LoadState) load_state="${value}" ;;
+            ActiveState) active_state="${value}" ;;
+            Result) result="${value}" ;;
+            ExecMainStartTimestamp) start_time="${value}" ;;
+        esac
+    done <<< "${state}"
+    [[ "${load_state}" == loaded ]] || fail "required system unit ${unit} is ${load_state:-unavailable}"
+    # Result= is success/exit-code/signal/timeout/...; it is never "failed".
+    [[ "${active_state}" != failed && "${result}" == success ]] \
+        || fail "system unit ${unit} failed during ${boot_pass} boot (ActiveState=${active_state:-unknown} Result=${result:-unknown})"
+    if [[ "${required_run}" == true && ( -z "${start_time}" || "${start_time}" == "n/a" ) ]]; then
+        fail "required system unit ${unit} did not execute during ${boot_pass} boot"
+    fi
+    if [[ "${required_enabled}" == true ]]; then
+        state="$(ssh_target "printf '%s\\n' '${TEST_PASSWORD}' | sudo -S -p '' systemctl is-enabled '${unit}'" 2>/dev/null || true)"
+        [[ "${state}" == enabled ]] || fail "required system unit ${unit} is ${state:-not enabled}"
+    fi
+    echo "  ${unit}: ${result:-unknown}"
+}
+
+check_user_setup_unit() {
+    local boot_pass="${1:-first}"
+    local unit="ublue-user-setup.service" state load_state="" active_state="" result="" start_time="" enabled="" key value
+    state="$(ssh_target "systemctl --user show --property=LoadState --property=ActiveState --property=Result --property=ExecMainStartTimestamp '${unit}'" 2>/dev/null || true)"
+    while IFS='=' read -r key value; do
+        case "${key}" in
+            LoadState) load_state="${value}" ;;
+            ActiveState) active_state="${value}" ;;
+            Result) result="${value}" ;;
+            ExecMainStartTimestamp) start_time="${value}" ;;
+        esac
+    done <<< "${state}"
+    [[ "${load_state}" == loaded ]] || fail "user unit ${unit} is ${load_state:-unavailable}"
+    # Result= is success/exit-code/signal/timeout/...; it is never "failed".
+    [[ "${active_state}" != failed && "${result}" == success ]] \
+        || fail "user unit ${unit} failed during ${boot_pass} boot (ActiveState=${active_state:-unknown} Result=${result:-unknown})"
+    [[ -n "${start_time}" && "${start_time}" != "n/a" ]] \
+        || fail "user unit ${unit} did not execute during ${boot_pass} boot"
+    enabled="$(ssh_target "systemctl --user is-enabled '${unit}'" 2>/dev/null || true)"
+    [[ "${enabled}" == enabled ]] || fail "user unit ${unit} is ${enabled:-not enabled}"
+    echo "  ${unit}: ${result:-unknown}; enabled"
+}
+
+verify_setup_state() {
+    local boot_pass="${1:-first}"
+    echo "Checking ${boot_pass}-boot setup units and desktop enablement..."
+    # Exclude network-bound update jobs and optional Tailscale: this VM has no
+    # network, so neither boot's setup checks should fail on those units.
+    check_system_unit_state flatpak-nuke-fedora.service true false "${boot_pass}"
+    check_system_unit_state flatpak-preinstall.service true true "${boot_pass}"
+    check_system_unit_state ublue-system-setup.service true true "${boot_pass}"
+    check_system_unit_state brew-setup.service true false "${boot_pass}"
+    for unit in input-remapper.service bluefin-stats-refresh.timer uupd.timer; do
+        check_system_unit_state "${unit}" true false "${boot_pass}"
+    done
+    check_user_setup_unit "${boot_pass}"
+}
+
+verify_flathub_remote() {
+    local remotes
+    remotes="$(ssh_target 'flatpak remotes --system --columns=name' 2>/dev/null || true)"
+    grep -qxF flathub <<< "${remotes}" || fail "system Flathub remote is not configured"
+    echo "  system Flathub remote present"
+}
+
+dump_flatpak_preinstall_diagnostics() {
+    local boot_pass="$1"
+    echo "Flatpak preinstall service diagnostics (${boot_pass}):" >&2
+    [[ -n "${TEST_PASSWORD:-}" ]] || return 0
+    ssh_target "printf '%s\\n' '${TEST_PASSWORD}' | sudo -S -p '' systemctl --no-pager status flatpak-preinstall.service" >&2 2>/dev/null || true
+    ssh_target "printf '%s\\n' '${TEST_PASSWORD}' | sudo -S -p '' journalctl -b -u flatpak-preinstall.service --no-pager -n 80" >&2 2>/dev/null || true
+}
+
+verify_flatpaks_after_repeat() {
+    local expected="$1" installed app
+    local -a missing=()
+    installed="$(ssh_target 'flatpak list --system --columns=application' 2>/dev/null || true)"
+    [[ -n "${installed}" ]] || fail "'flatpak list --system' returned nothing after the repeat boot"
+    while IFS= read -r app; do
+        [[ -n "${app}" ]] || continue
+        grep -qxF "${app}" <<< "${installed}" || missing+=("${app}")
+    done <<< "${expected}"
+    if (( ${#missing[@]} > 0 )); then
+        dump_flatpak_preinstall_diagnostics "repeat boot"
+        fail "default Flatpak(s) missing after the repeat boot: ${missing[*]}"
+    fi
+    echo "  default Flatpaks remain present after the repeat boot"
+}
+
+# luks-unlock.py returns on the sshd banner, which can precede GDM. Without
+# this gate the repeat-boot password can be typed before the greeter exists and
+# the dropped keystrokes would read as an idempotence failure.
+wait_for_repeat_greeter() {
+    local gdm_active=0 greeter_up=0
+    for _ in $(seq 1 24); do
+        if ssh_target 'systemctl is-active gdm.service' 2>/dev/null | grep -qx active; then
+            gdm_active=1
+            break
+        fi
+        sleep 5
+    done
+    (( gdm_active == 1 )) || fail "gdm is not running after the repeat boot"
+    echo "  repeat boot: gdm.service active"
+    # Before login the only gnome-shell is the greeter's own.
+    for _ in $(seq 1 24); do
+        if ssh_target 'pgrep -x gnome-shell >/dev/null' 2>/dev/null; then
+            greeter_up=1
+            break
+        fi
+        sleep 5
+    done
+    if (( greeter_up == 0 )); then
+        shot installed-repeat-no-greeter "${MONITOR_INSTALLED}" || true
+        fail "GDM greeter shell did not start after the repeat boot"
+    fi
+    sleep 5
+    shot installed-repeat-greeter "${MONITOR_INSTALLED}" || true
+}
+
+repeat_installed_boot() {
+    local serial_repeat="${WORK}/installed-repeat-boot.log"
+    local unlock_output="${WORK}/repeat-boot-unlock.log"
+    local disconnected=0 restart_seen=0 status=0 ssh_ready=0 graphical_ready=0
+    : > "${serial_repeat}"
+    echo "Starting serial capture and requesting a graceful reboot..."
+    tail -n 0 -F "${SERIAL_INSTALLED}" > "${serial_repeat}" &
+    serial_follow_pid=$!
+    sleep 1
+    ssh_target "printf '%s\\n' '${TEST_PASSWORD}' | sudo -S -p '' systemctl reboot" \
+        >/dev/null 2>&1 || true
+    for _ in $(seq 1 60); do
+        if ! ssh_target true 2>/dev/null; then
+            disconnected=1
+            break
+        fi
+        sleep 1
+    done
+    (( disconnected == 1 )) || fail "installed system did not disconnect for the requested reboot"
+
+    # SSH can disappear before QEMU has reset; until serial records shutdown,
+    # the framebuffer may still be the static desktop and resemble Plymouth.
+    for _ in $(seq 1 60); do
+        if grep -qaF 'reboot: Restarting system' "${serial_repeat}"; then
+            restart_seen=1
+            break
+        fi
+        sleep 1
+    done
+    (( restart_seen == 1 )) || fail "serial console did not confirm shutdown before repeat-boot unlock"
+
+    python3 "${ROOT}/iso/scripts/luks-unlock.py" qemu \
+        "${MONITOR_INSTALLED}" "${PASSPHRASE}" "${serial_repeat}" "${SSH_PORT_INSTALLED}" \
+        > "${unlock_output}" 2>&1 || status=$?
+    if (( status != 0 )); then
+        cat "${unlock_output}" >&2
+        tail -80 "${serial_repeat}" >&2 || true
+        fail "repeat-boot LUKS unlock or post-unlock boot failed (exit ${status})"
+    fi
+    for _ in $(seq 1 120); do
+        if ssh_target true 2>/dev/null; then
+            ssh_ready=1
+        fi
+        if grep -qaE 'Reached target.*Graphical' "${serial_repeat}"; then
+            graphical_ready=1
+        fi
+        (( ssh_ready == 1 && graphical_ready == 1 )) && break
+        sleep 5
+    done
+    kill "${serial_follow_pid}" 2>/dev/null || true
+    wait "${serial_follow_pid}" 2>/dev/null || true
+    serial_follow_pid=""
+    (( ssh_ready == 1 )) || fail "SSH did not return after the repeat boot"
+    (( graphical_ready == 1 )) || fail "repeat boot did not reach the graphical target"
+    wait_for_repeat_greeter
+    login_installed_user "repeat boot"
+    echo "  repeat boot: LUKS unlocked, SSH returned, and graphical target reached"
+}
+
 
 # A failed boot is diagnosed from the units that failed, not from whatever
 # happened to scroll past last. The console keeps printing after a unit fails
@@ -686,26 +876,30 @@ EOF
 
 # Type the password at the greeter. GDM offers the single account already
 # selected, so Enter opens the password field and the password submits it.
-echo "Logging in at the greeter as ${TEST_USER}..."
-monitor "${MONITOR_INSTALLED}" "sendkey ret" || true
-sleep 3
-send_keys "${MONITOR_INSTALLED}" "${TEST_PASSWORD}"
+login_installed_user() {
+    local boot_pass="$1" logged_in=0
+    echo "Logging in at the greeter as ${TEST_USER} (${boot_pass})..."
+    monitor "${MONITOR_INSTALLED}" "sendkey ret" || true
+    sleep 3
+    send_keys "${MONITOR_INSTALLED}" "${TEST_PASSWORD}"
 
-echo "Waiting for a GNOME session..."
-logged_in=0
-for i in $(seq 1 48); do
-    if ssh_target "pgrep -u ${TEST_USER} -x gnome-shell >/dev/null" 2>/dev/null; then
-        logged_in=1; break
+    echo "Waiting for a GNOME session after ${boot_pass}..."
+    for i in $(seq 1 48); do
+        if ssh_target "pgrep -u ${TEST_USER} -x gnome-shell >/dev/null" 2>/dev/null; then
+            logged_in=1
+            break
+        fi
+        sleep 5
+    done
+    if (( ! logged_in )); then
+        shot installed-login-failed "${MONITOR_INSTALLED}" || true
+        echo "--- sessions ---" >&2
+        ssh_target 'loginctl list-sessions --no-legend' >&2 2>/dev/null || true
+        fail "no gnome-shell for ${TEST_USER} after ${boot_pass} login"
     fi
-    sleep 5
-done
-if (( ! logged_in )); then
-    shot installed-login-failed "${MONITOR_INSTALLED}" || true
-    echo "--- sessions ---" >&2
-    ssh_target 'loginctl list-sessions --no-legend' >&2 2>/dev/null || true
-    fail "no gnome-shell for ${TEST_USER} after logging in at the greeter"
-fi
-echo "  gnome-shell: running as ${TEST_USER}"
+    echo "  gnome-shell: running as ${TEST_USER}"
+}
+login_installed_user "first boot"
 if [[ -n "${UTAH_E2E_EXPECT_FLAVOR:-}" ]]; then
     echo "Verifying the shared CountMe timer, report identity, and opt-out..."
     scp_target "${ROOT}/iso/scripts/verify-countme-runtime.sh" \
@@ -714,7 +908,6 @@ if [[ -n "${UTAH_E2E_EXPECT_FLAVOR:-}" ]]; then
     ssh_target "printf '%s\\n' '${TEST_PASSWORD}' | sudo -S -p '' bash /tmp/utah-verify-countme-runtime.sh '${UTAH_E2E_EXPECT_FLAVOR}'" \
         || fail "shared CountMe runtime verification failed"
 fi
-
 
 # A shell session that started is not the same as one whose extensions loaded.
 # Assert the enabled extensions raised no load-time error this boot -- the
@@ -895,9 +1088,21 @@ if [[ -n "${UTAH_E2E_FLATPAKS-x}" ]]; then
     [[ -n "${installed_flatpaks}" ]] \
         || fail "'flatpak list --system' returned nothing on the installed system"
     if (( ${#missing_flatpaks[@]} > 0 )); then
+        dump_flatpak_preinstall_diagnostics "first boot"
         fail "default Flatpak(s) missing on the installed, network-isolated system: ${missing_flatpaks[*]}"
     fi
     echo "  default Flatpaks present offline: ${expected_flatpaks//$'\n'/, }"
+fi
+
+if [[ -n "${UTAH_E2E_EXPECT_FLAVOR:-}" ]]; then
+    verify_flathub_remote
+    verify_setup_state first
+    repeat_installed_boot
+    verify_setup_state repeat
+    verify_flathub_remote
+    if [[ -n "${UTAH_E2E_FLATPAKS-x}" ]]; then
+        verify_flatpaks_after_repeat "${expected_flatpaks}"
+    fi
 fi
 
 echo
