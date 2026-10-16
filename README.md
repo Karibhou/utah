@@ -62,8 +62,8 @@ Like Bluefin, Utah builds four hardware flavors (`utah`, `utah-nvidia`,
 | | count |
 | --- | --- |
 | Bluefin contract installed | **61** |
-| Utah additions (GNOME 51, base-image parity, device firmware, desktop services) | 122 |
-| Genuinely unavailable | **10** |
+| Utah additions (GNOME 51, base-image parity, device firmware, desktop services) | 125 |
+| Genuinely unavailable | **7** |
 
 ## Known gaps
 
