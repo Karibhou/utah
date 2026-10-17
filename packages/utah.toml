@@ -643,4 +643,11 @@ parity = [
     "alsa-utils",
     "fprintd",
     "fprintd-pam",
+    # Media packages already consumed from the pinned factory (#12, #383).
+    # Fail the image build if a base package silently replaces one of them.
+    "intel-gmmlib",
+    "libva-intel-media-driver",
+    "intel-mediasdk",
+    "intel-vpl-gpu-rt",
+    "ffmpegthumbnailer",
 ]
