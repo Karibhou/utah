@@ -1,11 +1,11 @@
 #!/usr/bin/bash
-# Apply Utah's OS identity to the Hummingbird base after all packages and
+# Apply Bluefin Utah's identity to the Hummingbird base after all packages and
 # system-files overlays are present. Utah consumes Bluefin's desktop assets and
 # defaults, but remains a distinct, supportable Project Bluefin variant.
 
 set -eoux pipefail
 
-IMAGE_PRETTY_NAME="Utah"
+IMAGE_PRETTY_NAME="Bluefin"
 IMAGE_LIKE="fedora"
 IMAGE_NAME="${IMAGE_NAME:-utah}"
 # Canonical OS identity is always "utah", regardless of which image repository
@@ -51,7 +51,7 @@ set_os_release() {
     if grep -q "^${key}=" /usr/lib/os-release; then
         sed -i "s|^${key}=.*|${key}=\"${value}\"|" /usr/lib/os-release
     else
-        printf '%s="%s"\n' "${key}" "${value}" >> /usr/lib/os-release
+        printf '%s="%s"\n' "${key}" "${value}" >>/usr/lib/os-release
     fi
 }
 
@@ -102,7 +102,6 @@ done
 # Keep Bluefin's icon name and menu behavior; rebuild the index after every
 # overlay and logos-RPM operation so it includes our shipped symbolic SVG.
 gtk-update-icon-cache --force /usr/share/icons/hicolor
-
 
 # Compile the system dconf databases now so the GDM greeter picks up the
 # org.gnome.login-screen logo override (etc/dconf/db/gdm.d/01-bluefin-gdm-logo)
