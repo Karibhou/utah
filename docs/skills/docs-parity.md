@@ -43,17 +43,17 @@ Everything that is **true of the source repository right now**:
 - Identity, architecture, and the two-repository composition with
   `projectbluefin/utah-packages`.
 - The honest pre-alpha status, including which artifacts are published: the
-  testing live ISO, the `:testing` consumer tag after `post-testing-e2e`
-  validates a digest, and the rolling `:stable` tag that `execute-release.yml`
-  moves on each testing-to-main promotion behind the release gate (kept as the
-  interface by the #336 ruling).
+  live ISO (built monthly from `:stable` by `projectbluefin/dakota-iso`), the
+  `:testing` consumer tag after `post-testing-e2e` validates a digest, and the
+  rolling `:stable` tag that `execute-release.yml` releases weekly (Mondays
+  06:00 UTC) behind the release gate (kept as the interface by the #336 ruling).
 - The concise Known gaps list (Secure Boot and live-media boot paths, bootc
   update timers, ESP maintenance via `bootctl`, hardware/codec/driver
   validation, CUDA exclusion) — one bullet per gap; the docs page never
   carries a long form.
 - The Package parity table — both numbers and the byte-for-byte contract.
 - Verification record and provenance links (CI runs, screenshots).
-- The "Download and image streams" section: the testing ISO link and its
+- The "Download and image streams" section: the live ISO link and its
   SHA-256 checksum link, the pointer to `docs.projectbluefin.io/utah` for live
   versions and downloads (the catalog lives there, not in the README), the
   canonical flavor set from `config/flavors.json`, and the stream table.
@@ -86,8 +86,8 @@ page as follows:
 |---|---|---|---|
 | Identity | "Utah is Bluefin built on Fedora Hummingbird … Utah adds the desktop layer" | Same identity, plus the Fedora Hummingbird Magazine link | README "What it is" |
 | Two-repo composition | "Utah is composed across two coordinated repositories" with `projectbluefin/utah-packages` | Same two-repo table | README "What it is" |
-| Pre-alpha status | "Utah is an alpha build … its `:testing` container image is published on GHCR" | Testing container images and live ISOs are available for hardware testing; the `:testing` consumer tag is published on `ghcr.io/projectbluefin/utah:testing` once `post-testing-e2e` validates a digest; the rolling `:stable` tag moves on each testing-to-main promotion behind the release gate | README header + "Download and image streams" |
-| Download | `https://projectbluefin.dev/utah-live-latest.iso` | Same testing ISO URL plus its `-CHECKSUM` link, and a pointer to the docs page for live versions and downloads | README "Download and image streams" |
+| Pre-alpha status | "Utah is an alpha build … its `:testing` container image is published on GHCR" | Testing container images and live ISOs are available for hardware testing; the `:testing` consumer tag is published on `ghcr.io/projectbluefin/utah:testing` once `post-testing-e2e` validates a digest; the rolling `:stable` tag is released weekly (Mondays 06:00 UTC) behind the release gate | README header + "Download and image streams" |
+| Download | `https://projectbluefin.dev/utah-live-latest.iso` | Same ISO URL plus its `-CHECKSUM` link; built monthly from `:stable` by `projectbluefin/dakota-iso`; and a pointer to the docs page for live versions and downloads | README "Download and image streams" |
 | Image streams | `utah`, `utah-nvidia`, `utah-gaming`, `utah-nvidia-gaming` on stable/testing | Same set; canonical source is `config/flavors.json` | README "Download and image streams" |
 | Features / stack | Kernel options + OGC + Gaming mode; NVIDIA and Gaming flavors; GNOME 51 from source | Same explanations, with the precise kernel/NVIDIA/Secure Boot caveats | README "Known gaps" |
 | Current Versions | `<DriverVersionsCatalog streamId="utah-testing" />` (live, empty today) | Component kept; README does not duplicate it | docs page only |
@@ -105,7 +105,7 @@ this PR lands:
 - The hand-maintained GNOME-version statement. The `DriverVersionsCatalog`
   is the live source.
 - Any hand-written download URL in the wrapper. The README carries the
-  testing ISO and checksum links; duplicating them in the wrapper invites
+  live ISO and checksum links; duplicating them in the wrapper invites
   drift.
 
 ## Editing protocol
