@@ -1,7 +1,7 @@
 ---
 name: desktop-contract
 version: "1.0"
-last_updated: "2026-10-13"
+last_updated: "2026-10-25"
 id: desktop-contract
 one_line_purpose: Maintain Bluefin Utah identity, Bluefin desktop defaults, and first-boot Flatpak policy.
 entry_point: docs/skills/desktop-contract.md
@@ -198,25 +198,15 @@ one is pending a composefs boot check (see below):
   adds a no-op `pulse.cmd = [ ]`; drop it once common's copy parses.
 - `systemd-remount-fs.service: mount: /: fsconfig() failed: overlay: No
   changes allowed in reconfigure` (#585): systemd-remount-fs unconditionally
-  remounts / read-write. On the composefs image `/` is mounted `ro`
-  (`findmnt /` reports `composefs overlay ro,...`), so the remount fails and
-  the unit exits 1, leaving `SystemState=degraded` even when nothing else
-  is wrong. `systemd-remount-fs.service.d/10-utah-composefs-skip.conf` adds
-  `ConditionPathIsReadWrite=/`; composefs's `ST_RDONLY` flag makes the
-  condition fail, systemd skips the unit instead of failing it. The live
-  ISO path (`iso/scripts/build-iso.sh`, overlay root) is mounted writable,
-  so the condition succeeds and the remount still runs there. A blanket
-  mask would silence both paths; a condition keyed on the mount state
-  keeps the writable ISO alive. Limitation: the condition is false on any
-  boot where `/` is read-only, including non-composefs ones (`ro` /
-  `rootflags=ro` kargs, an fsck fallback, an incomplete ostree
-  deployment), so the unit is skipped there too. The skip covers the
-  whole unit, not just `/`: other fstab entries systemd-remount-fs would
-  remount (`/usr`, API VFS such as a `/tmp` tmpfs or `/proc` `hidepid=`)
-  are also left alone. Utah ships no such entries, so only operator-added fstab
-  lines are affected; removing the drop-in restores the unit. The verifier in
-  `tests/test_boot_noise.py` keeps the drop-in in sync with the contract.
-  Not yet boot-verified: on a composefs VM, confirm
+  remounts `/` read-write, but the composefs root is `ro` (`findmnt /` shows
+  `composefs overlay ro,...`), so the remount fails and the unit exits 1.
+  `systemd-remount-fs.service.d/10-utah-composefs-skip.conf` adds
+  `ConditionPathIsReadWrite=/`, which composefs's `ST_RDONLY` flag fails, so
+  systemd skips the unit. The writable live ISO root still runs the remount.
+  Limitation: any read-only `/` (non-composefs `ro` kargs, fsck fallback,
+  incomplete ostree deployment) skips the unit too. Removing the drop-in
+  restores it; `tests/test_boot_noise.py` keeps the drop-in in sync with the
+  contract. Not yet boot-verified: on a composefs VM, confirm
   `systemctl show -p ActiveState,ConditionResult systemd-remount-fs` reports
   `inactive`/`no` and `systemctl is-system-running` reports `running`.
 
@@ -449,6 +439,16 @@ the base names, and a genuinely attached serial device on another port still
 gets its login. A mask is also the only lever that works here — the generator's
 `getty.target.wants` symlink is created in `/run` at boot, so it cannot be
 deleted at build time, and a preset entry alone would not stop it.
+
+### The newly added network daemons are held disabled (#869)
+
+The parity rollout (#868) added network daemons that Hummingbird's
+`99-default-disable.preset` must keep off. The `disabled` list in
+`contracts/bluefin-desktop.toml` (checked by `verify-desktop-contract.py`)
+fails the build if `dnsmasq.service`, `rpcbind.service`/`.socket`,
+`autofs.service`, `openvpn-{client,server}@.service`, `saned.socket` or
+`ipp-usb.service` is enabled; masked, static (ipp-usb is udev-started) or
+absent units count as off. Keep it in sync with `baselines/triage.toml`.
 
 ### The fwupd-refresh unit pins a static user (#385)
 
