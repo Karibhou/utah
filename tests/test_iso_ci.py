@@ -289,11 +289,20 @@ class EvidenceTests(unittest.TestCase):
         # Defined once, called once inside the per-label loop.
         self.assertEqual(script.count("screenshot_not_blank()"), 1)
         self.assertEqual(gate.count("screenshot_not_blank"), 1)
+        # #901: live-desktop is held to the retake loop's body-mode check.
+        self.assertIn('if [[ "${label}" == live-desktop ]]; then mode=body; fi', gate)
+        self.assertIn('screenshot_not_blank "${SHOTS}/${label}.png" "${mode}"', gate)
 
-    def _make_png(self, path, solid):
+    def _make_png(self, path, solid, top_bar_only=False):
         import struct, zlib
         w, h = 1920, 1080
-        if solid:
+        if top_bar_only:
+            # A busy 32px strip over a flat black body: gnome-shell has drawn
+            # its top bar but nothing else yet.
+            px = [((x * 7) % 256, (y * 11) % 256, ((x + y) * 3) % 256)
+                  for y in range(32) for x in range(w)]
+            px += [(0, 0, 0)] * (w * (h - 32))
+        elif solid:
             px = [(0, 0, 0)] * (w * h)
         else:
             # A busy gradient: thousands of distinct colours, unlike a frozen
@@ -484,7 +493,7 @@ class EvidenceTests(unittest.TestCase):
         retake_fn = "shot_until_drawn() {" + script.split(
             "shot_until_drawn() {", 1)[1].split("\n}\n", 1)[0] + "\n}\n"
 
-        def drive(blank_shots, ext="png"):
+        def drive(blank_shots, ext="png", blank_kind="solid", final_mode=""):
             with tempfile.TemporaryDirectory() as td:
                 td = Path(td)
                 if ext == "ppm":
@@ -496,7 +505,8 @@ class EvidenceTests(unittest.TestCase):
                         b"P6\n%d %d\n255\n" % (w, h)
                         + bytes((i * 7) % 256 for i in range(w * h * 3)))
                 else:
-                    self._make_png(td / "blank.png", True)
+                    self._make_png(td / "blank.png", blank_kind == "solid",
+                                   top_bar_only=blank_kind == "bar")
                     self._make_png(td / "real.png", False)
                 harness = (
                     f"SHOTS={td}\ncalls=0\nsleep() {{ :; }}\n"
@@ -507,7 +517,7 @@ class EvidenceTests(unittest.TestCase):
                     + blank_fn + retake_fn
                     + "shot_until_drawn live-desktop sock\n"
                     "echo calls=$calls\n"
-                    f"if ( screenshot_not_blank \"$SHOTS/live-desktop.{ext}\" ) >/dev/null 2>&1; "
+                    f"if ( screenshot_not_blank \"$SHOTS/live-desktop.{ext}\" {final_mode} ) >/dev/null 2>&1; "
                     "then echo final=drawn; else echo final=blank; fi\n")
                 return subprocess.run(["bash", "-eu", "-c", harness],
                                       capture_output=True, text=True)
@@ -520,6 +530,16 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(never.returncode, 0, never.stderr)
         self.assertIn("calls=12", never.stdout)
         self.assertIn("final=blank", never.stdout)
+        bar = drive(2, "png", "bar")
+        self.assertEqual(bar.returncode, 0, bar.stderr)
+        self.assertIn("calls=3", bar.stdout)
+        self.assertIn("final=drawn", bar.stdout)
+        # A frame stuck at top-bar-only must fail the end-of-run gate, which
+        # checks live-desktop in body mode like the retake loop does.
+        bar_never = drive(99, "png", "bar", "body")
+        self.assertEqual(bar_never.returncode, 0, bar_never.stderr)
+        self.assertIn("calls=12", bar_never.stdout)
+        self.assertIn("final=blank", bar_never.stdout)
         ppm = drive(2, "ppm")
         self.assertEqual(ppm.returncode, 0, ppm.stderr)
         self.assertIn("calls=3", ppm.stdout)
