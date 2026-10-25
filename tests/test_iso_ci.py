@@ -472,6 +472,58 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(skipped.returncode, 0, skipped.stderr)
         self.assertNotIn("present offline", skipped.stdout)
 
+    def test_live_desktop_is_retaken_until_the_frame_is_drawn(self):
+        # The live-desktop shot is grabbed as soon as gnome-shell's process
+        # exists, which can be before anything is drawn. A flat frame there must
+        # be retaken, not left for the end-of-run gate to fail a healthy boot;
+        # a frame that never draws must still be left blank for that gate.
+        script = (ROOT / "iso/scripts/luks-e2e.sh").read_text()
+        blank_fn = "screenshot_not_blank() {" + script.split(
+            "screenshot_not_blank() {", 1)[1].split("\n}\n", 1)[0] + "\n}\n"
+        retake_fn = "shot_until_drawn() {" + script.split(
+            "shot_until_drawn() {", 1)[1].split("\n}\n", 1)[0] + "\n}\n"
+
+        def drive(blank_shots, ext="png"):
+            with tempfile.TemporaryDirectory() as td:
+                td = Path(td)
+                if ext == "ppm":
+                    # shot() keeps the raw PPM when ffmpeg is unavailable.
+                    w, h = 16, 16
+                    (td / "blank.ppm").write_bytes(
+                        b"P6\n%d %d\n255\n" % (w, h) + bytes(w * h * 3))
+                    (td / "real.ppm").write_bytes(
+                        b"P6\n%d %d\n255\n" % (w, h)
+                        + bytes((i * 7) % 256 for i in range(w * h * 3)))
+                else:
+                    self._make_png(td / "blank.png", True)
+                    self._make_png(td / "real.png", False)
+                harness = (
+                    f"SHOTS={td}\ncalls=0\nsleep() {{ :; }}\n"
+                    "fail() { echo FAIL: $* >&2; exit 1; }\n"
+                    "shot() { calls=$((calls+1)); "
+                    f"if [ $calls -le {blank_shots} ]; then cp {td}/blank.{ext} \"$SHOTS/$1.{ext}\"; "
+                    f"else cp {td}/real.{ext} \"$SHOTS/$1.{ext}\"; fi; }}\n"
+                    + blank_fn + retake_fn
+                    + "shot_until_drawn live-desktop sock\n"
+                    "echo calls=$calls\n"
+                    f"if ( screenshot_not_blank \"$SHOTS/live-desktop.{ext}\" ) >/dev/null 2>&1; "
+                    "then echo final=drawn; else echo final=blank; fi\n")
+                return subprocess.run(["bash", "-eu", "-c", harness],
+                                      capture_output=True, text=True)
+
+        early = drive(3)
+        self.assertEqual(early.returncode, 0, early.stderr)
+        self.assertIn("calls=4", early.stdout)
+        self.assertIn("final=drawn", early.stdout)
+        never = drive(99)
+        self.assertEqual(never.returncode, 0, never.stderr)
+        self.assertIn("calls=12", never.stdout)
+        self.assertIn("final=blank", never.stdout)
+        ppm = drive(2, "ppm")
+        self.assertEqual(ppm.returncode, 0, ppm.stderr)
+        self.assertIn("calls=3", ppm.stdout)
+        self.assertIn("final=drawn", ppm.stdout)
+
     def test_setup_unit_checks_reject_non_success_results(self):
         # systemd's Result= is success/exit-code/signal/timeout/...; it is never
         # "failed" (that is an ActiveState). A setup unit that exited non-zero
