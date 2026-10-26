@@ -466,6 +466,7 @@ build-ghcr base_name stream flavor kernel_pin="":
     # before timestamp rewriting could invalidate its Python caches.
     source_date_epoch="${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct -- Containerfile packages system_files scripts config .gitmodules docs/agent)}"
     mapfile -t epoch_args < <(scripts/podman-epoch-args.sh "${source_date_epoch}" rewrite)
+    gnome_extension_provenance="$(python3 scripts/verify-gnome-extensions.py --print-provenance)"
     podman build \
       "${epoch_args[@]}" \
       --build-arg SOURCE_DATE_EPOCH="${source_date_epoch}" \
@@ -478,6 +479,8 @@ build-ghcr base_name stream flavor kernel_pin="":
       --build-arg IMAGE_FLAVOR={{ flavor }} \
       --build-arg IMAGE_VENDOR={{ repo_organization }} \
       --build-arg VERSION="$version" \
+      --build-arg SHA_HEAD="$(git rev-parse HEAD)" \
+      --build-arg GNOME_EXTENSION_PROVENANCE="${gnome_extension_provenance}" \
       --build-arg SHA_HEAD_SHORT="$(git rev-parse --short HEAD)" \
       --build-arg ENABLE_SSHD="${ENABLE_SSHD:-0}" \
       --tag "localhost/$image_name:{{ stream }}" \
@@ -504,6 +507,7 @@ build-local stream="testing" package_image="localhost/utah-packages:local-merged
     # Same build-input epoch and guarded export policy as build-ghcr.
     source_date_epoch="${SOURCE_DATE_EPOCH:-$(git log -1 --format=%ct -- Containerfile packages system_files scripts config .gitmodules docs/agent)}"
     mapfile -t epoch_args < <(scripts/podman-epoch-args.sh "${source_date_epoch}" rewrite)
+    gnome_extension_provenance="$(python3 scripts/verify-gnome-extensions.py --print-provenance)"
     podman build \
       "${epoch_args[@]}" \
       --build-arg SOURCE_DATE_EPOCH="${source_date_epoch}" \
@@ -514,6 +518,8 @@ build-local stream="testing" package_image="localhost/utah-packages:local-merged
       --build-arg IMAGE_FLAVOR=main \
       --build-arg IMAGE_VENDOR="{{ repo_organization }}" \
       --build-arg VERSION="$version" \
+      --build-arg SHA_HEAD="$(git rev-parse HEAD)" \
+      --build-arg GNOME_EXTENSION_PROVENANCE="${gnome_extension_provenance}" \
       --build-arg SHA_HEAD_SHORT="$(git rev-parse --short HEAD)" \
       --build-arg ENABLE_SSHD="${ENABLE_SSHD:-1}" \
       --tag "localhost/{{ image }}:{{ stream }}" \
