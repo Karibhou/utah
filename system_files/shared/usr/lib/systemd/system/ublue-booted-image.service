@@ -8,7 +8,12 @@ Before=systemd-user-sessions.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/ublue-booted-image-sync
+RuntimeDirectory=ublue-os
+RuntimeDirectoryPreserve=yes
+StandardOutput=truncate:/run/ublue-os/booted-image.json
+# Execute bootc directly so its SELinux entrypoint grants the required domain.
+ExecStart=-/usr/bin/bootc status --json
+ExecStartPost=/usr/bin/ublue-booted-image-sync
 
 [Install]
 WantedBy=multi-user.target
