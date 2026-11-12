@@ -177,6 +177,12 @@ it has no `[Install]`: `bootc-unified-storage.timer` starts it 15 minutes after
 boot. Never wrap `bootc` in `sh -c`: its `install_exec_t` label is its SELinux
 entrypoint (wrapped, `chcon` was denied). Pinned by `tests/test_unified_storage_unit.py`.
 
+`ublue-booted-image.service` likewise runs bootc directly and passes its JSON
+through `/run/ublue-booted-image.json` to the snapshot writer. The unit uses
+append output because systemd opens it for every command, including the
+post-start parser; a pre-start removal prevents stale JSON on restart. Verify
+the snapshot against bootc and check the audit log on a booted image (#1198).
+
 ## Boot-error noise is a bug (#444)
 
 `ujust report` attaches the current boot's error-priority journal, and on a

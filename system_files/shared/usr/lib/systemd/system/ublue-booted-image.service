@@ -8,7 +8,10 @@ Before=systemd-user-sessions.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/bin/ublue-booted-image-sync
+ExecStartPre=/usr/bin/rm -f /run/ublue-booted-image.json
+ExecStart=-/usr/bin/bootc status --json
+StandardOutput=append:/run/ublue-booted-image.json
+ExecStartPost=/usr/bin/ublue-booted-image-sync
 
 [Install]
 WantedBy=multi-user.target

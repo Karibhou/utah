@@ -7,8 +7,9 @@
 # always accurate. Parity with Dakota (projectbluefin/utah#675).
 set -euo pipefail
 
-bootc_json="$(bootc status --json 2>/dev/null || true)"
-ref="$(jq -r '.status.booted.image.image.image // empty' <<<"${bootc_json}" 2>/dev/null || true)"
+json=/run/ublue-booted-image.json
+trap 'rm -f "${json}"' EXIT
+ref="$(jq -r '.status.booted.image.image.image // empty' "${json}" 2>/dev/null || true)"
 if [ -z "${ref}" ]; then
     echo "no booted bootc image found; leaving no state file" >&2
     exit 0
