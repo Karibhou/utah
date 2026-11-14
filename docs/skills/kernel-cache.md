@@ -101,6 +101,10 @@ base. Moving `BASE_IMAGE` to a new kernel before then means moving
 compiles the old kernel successfully, then `rpm -U` rejects replacing the
 newer base kernel. Never use `--oldpackage` to hide a stale source pin; rebuild
 the base's exact Fedora version and retain source signature and digest checks.
+The NVIDIA installer's pristine Fedora fallback pins a matching
+`KERNEL_DEVEL_NEVR` and Koji RPM SHA-256; update both alongside the Fedora
+source pins. The patched kernel uses its cached development RPM instead and
+cannot use the pristine Koji package.
 The `check` also rejects a cache with the wrong module tree. Secure Boot: the
 rebuild is not signed by Fedora's key, so with Secure Boot enforcing, shim
 refuses it just as it refuses the OGC kernel.

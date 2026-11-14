@@ -33,9 +33,23 @@ class KernelDevelPinTests(unittest.TestCase):
         self.assertRegex(constant("KERNEL_DEVEL_SHA256"), r"^[0-9a-f]{64}$")
 
     def test_the_pin_matches_the_kernel_the_base_image_boots(self):
-        # The one assertion that actually catches the staleness: the recorded
-        # NEVR has to be the kernel this base carries. Update both together.
-        self.assertEqual(constant("KERNEL_DEVEL_NEVR"), "7.2.14-200.fc44.x86_64")
+        # The rebuilt kernel tracks the pristine base's version and release.
+        fedora_script = (ROOT / "scripts/install-fedora-kernel.sh").read_text()
+        version = re.search(
+            r'^FEDORA_KERNEL_VERSION="\$\{UTAH_FEDORA_KERNEL_VERSION:-([^}]+)\}"',
+            fedora_script, re.MULTILINE,
+        ).group(1)
+        release = re.search(
+            r'^FEDORA_KERNEL_RELEASE="\$\{UTAH_FEDORA_KERNEL_RELEASE:-([^}]+)\}"',
+            fedora_script, re.MULTILINE,
+        ).group(1)
+        self.assertEqual(constant("KERNEL_DEVEL_NEVR"), f"{version}-{release}.x86_64")
+
+    def test_the_pin_has_the_matching_koji_digest(self):
+        self.assertEqual(
+            constant("KERNEL_DEVEL_SHA256"),
+            "477dc42f8470e48de2430e34253ac3c21e41d6df4603d822b7c55be2ac01f104",
+        )
 
     def test_a_mismatched_kernel_fails_before_downloading_60mb(self):
         """Drive the real guard: a kernel that is not the recorded one exits 1."""
