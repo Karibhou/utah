@@ -246,6 +246,8 @@ packages = [
     "ghostscript",
     "fprintd",
     "fprintd-pam",
+    # Smart-card PKCS#11 support, matching Dakota and Bluefin (#1257).
+    "opensc",
     "poppler-utils",
     # Sensors, iPhone tools and the everyday editor Bluefin ships.
     "lm_sensors",

@@ -65,6 +65,12 @@ Flatpak (`contracts/bluefin-desktop.toml` `[flatpak]`). Transitional native
 payloads need an inline drop condition in `packages/utah.toml`; the factory
 follows the same rule when importing recipes.
 
+## Smart cards
+
+`opensc` supplies smart-card PKCS#11 support and is requested explicitly in
+`[parity]`; installing it does not by itself enable smart-card login. Verify
+the reader and card on hardware before claiming authentication works.
+
 ## Wi-Fi documentation currency
 
 Wi-Fi needs both `[hardware]` firmware and the `[parity]` userspace stack:

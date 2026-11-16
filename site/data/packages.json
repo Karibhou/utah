@@ -242,6 +242,7 @@
         "openal-soft",
         "openconnect",
         "openh264",
+        "opensc",
         "openvpn",
         "orca",
         "papers-libs",
@@ -372,7 +373,7 @@
     }
   ],
   "totals": {
-    "installed": 315,
+    "installed": 316,
     "unavailable": 7
   },
   "unavailable": [
