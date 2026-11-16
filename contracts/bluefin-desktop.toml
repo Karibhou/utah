@@ -137,6 +137,7 @@ files = [
   "/usr/bin/ublue-image-info.sh",
   "/usr/libexec/ublue-booted-image",
   "/etc/profile.d/uwelcome.sh",
+  "/etc/skel/.config/ghostty/config.ghostty",
   # Common's Red Hat signature policy uses the unsuffixed key path. The pinned
   # Hummingbird base carries that key; Utah also stages its repository copy.
   "/etc/containers/policy.json",
@@ -147,6 +148,9 @@ files = [
 ]
 
 [configuration.file_contains]
+"/etc/skel/.config/ghostty/config.ghostty" = [
+  "theme = light:Catppuccin Latte,dark:Catppuccin Mocha",
+]
 "/usr/lib/bootc/kargs.d/10-utah-plymouth.toml" = [
   'kargs = ["plymouth.ignore-serial-consoles"]',
 ]

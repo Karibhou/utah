@@ -95,6 +95,9 @@ The TOML's sections are the contract's table of contents:
   timer is hemisphere-aware and rotates live at month boundaries, while
   Dakota's boot-time month symlink is northern-only and stale until reboot, so
   repointing the default would stand the better rotator down (#675 decision).
+  New accounts inherit a Ghostty profile that follows GNOME's light/dark
+  preference; existing user configurations are not overwritten. The image
+  contract checks the skeleton profile after Common's default is patched.
 
   A unit being enabled in the built image is not the same as it being enabled
   on a booted one. bootc applies presets on first boot, and Hummingbird's

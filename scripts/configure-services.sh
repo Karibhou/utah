@@ -94,6 +94,13 @@ enable_unit ublue-booted-image.service
 # timer (hemisphere-aware, live month-boundary rotation) rather than Dakota's
 # boot-time month symlink: repointing the default would stand the Common
 # rotator down with no replacement until reboot (#675 decision, #732 review).
+# New accounts inherit Ghostty's theme from GNOME's light/dark preference.
+# Preserve existing users' configuration and fail if Common changes the default.
+GHOSTTY_CONFIG=/etc/skel/.config/ghostty/config.ghostty
+if grep -qx 'theme = Catppuccin Mocha' "${GHOSTTY_CONFIG}"; then
+    sed -i 's/^theme = Catppuccin Mocha$/theme = light:Catppuccin Latte,dark:Catppuccin Mocha/' "${GHOSTTY_CONFIG}"
+fi
+grep -qx 'theme = light:Catppuccin Latte,dark:Catppuccin Mocha' "${GHOSTTY_CONFIG}"
 # Installation date for fastfetch: read the first-boot timestamp instead of
 # inferring the image age from /var/log timestamps.
 FASTFETCH_JSONC=/usr/share/ublue-os/fastfetch.jsonc
