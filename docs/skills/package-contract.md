@@ -128,6 +128,28 @@ Remaining #383 gaps include full FFmpeg (the decided direction, replacing
 `-free`) and `gst-thumbnailers` (factory #527); neither is published in this
 pin. Keep #383 open for those factory deliveries and hardware/codec proof.
 
+## Dakota runtime library gaps
+
+The Dakota image comparison in #1264 identified libraries that were absent
+from the measured Utah image. A library's presence in Dakota alone is not a
+reason to install it independently: its Utah consumer should request it through
+RPM dependencies. Until a Utah consumer needs them, the following standalone
+installs are waived:
+
+- `libdex`, `libgee`, and `libmediaart`: GNOME and media-sharing libraries.
+- `libslirp` and `spice-protocol`: virtualization networking and protocol data.
+- `kyotocabinet`: a database library used by input-method software.
+- `libssh2` and `c-ares`: network client libraries.
+- `libbluray`, `libpaper`, `slang`, `sonic`, and `xcb-util-cursor`:
+  media, printing, terminal, audio, and X11 client libraries respectively.
+
+This waives only independent installation, not the associated features.
+Rygel, guest integration, and input-method gaps remain tracked in
+`baselines/triage.toml`. When adding a consumer, resolve its dependency
+transaction against the pinned repositories and verify the resulting image;
+add a direct request only if the consumer needs a library that its RPM
+dependencies do not pull in.
+
 ## Repository policy
 
 Runtime repositories are the pinned `utah-packages` repository (listed first)
