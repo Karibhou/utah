@@ -212,6 +212,8 @@ packages = [
     "stix-fonts",
     # Shell and tooling Bluefin users reach for
     "bash-completion",
+    # Git large-file support, including the system filter configured at build time.
+    "git-lfs",
     "man-db",
     "less",
     "which",

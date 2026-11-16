@@ -65,6 +65,10 @@ Flatpak (`contracts/bluefin-desktop.toml` `[flatpak]`). Transitional native
 payloads need an inline drop condition in `packages/utah.toml`; the factory
 follows the same rule when importing recipes.
 
+Git LFS is a runtime `[parity]` package. Image composition runs
+`git lfs install --system` and checks a clean/checkout round trip, so Git
+handles tracked large files without per-user setup.
+
 ## Wi-Fi documentation currency
 
 Wi-Fi needs both `[hardware]` firmware and the `[parity]` userspace stack:

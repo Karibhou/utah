@@ -284,6 +284,17 @@ RUN --mount=type=bind,from=packages,source=/repository,target=/etc/utah-packages
     : > /etc/crypttab && \
     /usr/local/libexec/utah-install-packages \
       /usr/share/utah/bluefin.toml /usr/share/utah/utah.toml && \
+    git lfs install --system && \
+    lfs_test="$(mktemp -d)" && \
+    git init -q "$lfs_test" && \
+    git -C "$lfs_test" lfs track '*.bin' && \
+    printf 'Utah LFS test\n' > "$lfs_test/sample.bin" && \
+    git -C "$lfs_test" add .gitattributes sample.bin && \
+    git -C "$lfs_test" show :sample.bin | grep -q '^version https://git-lfs.github.com/spec/v1$' && \
+    rm "$lfs_test/sample.bin" && \
+    git -C "$lfs_test" checkout -- sample.bin && \
+    test "$(cat "$lfs_test/sample.bin")" = 'Utah LFS test' && \
+    rm -rf "$lfs_test" && \
     IMAGE_FLAVOR=main /usr/local/libexec/utah-verify-rpm-contract \
       /usr/share/utah/bluefin.toml /usr/share/utah/utah.toml && \
     /usr/local/libexec/utah-fix-home-labels && \
